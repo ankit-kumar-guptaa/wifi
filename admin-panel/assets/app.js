@@ -1,20 +1,7 @@
-const API_BASE='http://localhost:8000/api';
-let devices=[];
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-async function load(){
- try{const h=await fetch(API_BASE+'/health');const hd=await h.json();document.querySelector('#api').textContent=hd.success?'Online':'Error';}catch{document.querySelector('#api').textContent='Offline';}
- try{const r=await fetch(API_BASE+'/devices');const d=await r.json();devices=d.devices||[];}catch{devices=[];}
- render();
-}
-function render(){
- const online=devices.filter(x=>x.connection_status==='online').length;
- document.querySelector('#total').textContent=devices.length;
- document.querySelector('#online').textContent=online;
- document.querySelector('#offline').textContent=devices.length-online;
- const q=document.querySelector('#search').value.toLowerCase();
- const rows=devices.filter(x=>[x.device_id,x.hostname,x.os_name].join(' ').toLowerCase().includes(q));
- document.querySelector('#deviceRows').innerHTML=rows.length?rows.map(x=>'<tr><td>'+esc(x.device_id)+'</td><td>'+esc(x.hostname||'—')+'</td><td>'+esc(x.os_name||'—')+'</td><td><span class="status '+esc(x.connection_status||'offline')+'">'+esc(x.connection_status||'offline')+'</span></td><td>'+esc(x.last_heartbeat_at||'—')+'</td></tr>').join(''):'<tr><td colspan="5">No devices yet.</td></tr>';
-}
-document.querySelector('#refreshBtn').addEventListener('click',load);
-document.querySelector('#search').addEventListener('input',render);
-load();
+const API_BASE='http://localhost:8000/api';let devices=[];const $=s=>document.querySelector(s);const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));const auth=()=>localStorage.getItem('wm_admin_token')||'';const headers=()=>({'Content-Type':'application/json',...(auth()?{Authorization:'Bearer '+auth()}: {})});
+async function api(path,opt={}){const r=await fetch(API_BASE+path,{...opt,headers:{...headers(),...(opt.headers||{})}});const d=await r.json();if(!r.ok||d.success===false)throw new Error(d.message||'Request failed');return d}
+async function login(){try{const d=await api('/auth/login',{method:'POST',body:JSON.stringify({email:$('#email').value,password:$('#password').value})});localStorage.setItem('wm_admin_token',d.token);showApp();await load()}catch(e){$('#loginMsg').textContent=e.message}}
+function showApp(){const ok=!!auth();$('#login').hidden=ok;$('#app').hidden=!ok}
+async function load(){try{const h=await api('/health');$('#api').textContent=h.status==='ok'?'Online':'Error'}catch{$('#api').textContent='Offline'}try{const d=await api('/devices');devices=d.devices||[]}catch(e){if(e.message.includes('token')){localStorage.removeItem('wm_admin_token');showApp();return}devices=[]}render()}
+function render(){const online=devices.filter(x=>x.connection_status==='online').length;$('#total').textContent=devices.length;$('#online').textContent=online;$('#offline').textContent=devices.length-online;const q=$('#search').value.toLowerCase();const rows=devices.filter(x=>[x.device_id,x.hostname,x.wifi_ssid].join(' ').toLowerCase().includes(q));$('#deviceRows').innerHTML=rows.length?rows.map(x=>'<tr><td><b>'+esc(x.device_id)+'</b><br><small>'+esc(x.os_name||'')+'</small></td><td>'+esc(x.hostname||'—')+'</td><td><span class="status '+esc(x.connection_status||'offline')+'">'+esc(x.connection_status||'offline')+'</span></td><td>'+esc(x.wifi_ssid||'Not scanned')+'<br><small>'+esc(x.wifi_radio||'')+' '+esc(x.wifi_channel||'')+'</small></td><td>'+esc(x.wifi_signal||'—')+'</td><td>'+esc(x.last_heartbeat_at||'—')+'</td><td><button class="scan" data-id="'+encodeURIComponent(x.device_id)+'">Scan Now</button></td></tr>').join(''):'<tr><td colspan="7">No enrolled devices.</td></tr>';document.querySelectorAll('.scan').forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent='Queued…';try{await api('/devices/'+b.dataset.id+'/scan',{method:'POST'});b.textContent='Queued';setTimeout(load,2500)}catch(e){b.disabled=false;b.textContent=e.message}})}
+$('#loginBtn').onclick=login;$('#refreshBtn').onclick=load;$('#search').oninput=render;$('#logoutBtn').onclick=()=>{localStorage.removeItem('wm_admin_token');showApp()};$('#codeBtn').onclick=async()=>{try{const d=await api('/devices/enrollment-code',{method:'POST'});$('#codeBox').textContent='Enrollment code: '+d.code+' — '+d.expires_in}catch(e){$('#codeBox').textContent=e.message}};showApp();if(auth())load();
