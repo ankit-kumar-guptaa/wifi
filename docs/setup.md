@@ -12,7 +12,7 @@ php admin-backend/tools/create_admin.php admin@example.com "StrongPasswordHere" 
 ## 3. Start the PHP API
 ```bash
 cd admin-backend
-php -S localhost:8000 -t public
+php -S localhost:8000 -t public public/router.php
 ```
 
 ## 4. Start the admin panel
