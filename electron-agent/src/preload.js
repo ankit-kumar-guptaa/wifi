@@ -1,2 +1,1 @@
-const {contextBridge}=require('electron');
-contextBridge.exposeInMainWorld('agent',{getStatus:()=>({status:'running'})});
+const {contextBridge,ipcRenderer}=require('electron');contextBridge.exposeInMainWorld('agent',{registerDevice:code=>ipcRenderer.invoke('register-device',code),getStatus:()=>ipcRenderer.invoke('agent-status')});
