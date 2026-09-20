@@ -1,0 +1,33 @@
+CREATE DATABASE IF NOT EXISTS wifi_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE wifi_manager;
+
+CREATE TABLE IF NOT EXISTS admins (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(120) NOT NULL,
+  email VARCHAR(190) NOT NULL UNIQUE,
+  password_hash VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id VARCHAR(128) NOT NULL UNIQUE,
+  hostname VARCHAR(255) NULL,
+  os_name VARCHAR(100) NULL,
+  app_version VARCHAR(40) NULL,
+  last_ip VARCHAR(64) NULL,
+  connection_status ENUM('online','offline') NOT NULL DEFAULT 'offline',
+  last_heartbeat_at TIMESTAMP NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS device_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  device_id VARCHAR(128) NOT NULL,
+  event_type VARCHAR(80) NOT NULL,
+  payload JSON NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_device_events_device (device_id),
+  INDEX idx_device_events_created (created_at)
+);
