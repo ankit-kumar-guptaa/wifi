@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WiFi Device Management</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<aside class="sidebar">
+<div class="brand">WiFi<span>Manager</span></div>
+<nav><a class="active" href="#">Dashboard</a><a href="#">Devices</a><a href="#">Activity</a><a href="#">Reports</a><a href="#">Settings</a></nav>
+</aside>
+<main class="main">
+<header class="topbar"><div><h1>Device Overview</h1><p>Authorized managed devices</p></div><button id="refreshBtn">Refresh</button></header>
+<section class="cards">
+<article><small>Total devices</small><strong id="total">0</strong></article>
+<article><small>Online</small><strong id="online">0</strong></article>
+<article><small>Offline</small><strong id="offline">0</strong></article>
+<article><small>API status</small><strong id="api">Checking…</strong></article>
+</section>
+<section class="panel">
+<div class="panel-head"><h2>Devices</h2><input id="search" placeholder="Search device…"></div>
+<div class="table-wrap"><table><thead><tr><th>Device</th><th>Hostname</th><th>OS</th><th>Status</th><th>Last heartbeat</th></tr></thead><tbody id="deviceRows"><tr><td colspan="5">No devices yet.</td></tr></tbody></table></div>
+</section>
+</main>
+<script src="assets/app.js"></script>
+</body>
+</html>
