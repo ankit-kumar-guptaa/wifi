@@ -103,7 +103,7 @@ if ($uri==='/api/devices/scan-result' && $method==='POST') {
 
 if ($uri==='/api/devices' && $method==='GET') {
     admin_id();
-    $rows=db()->query("SELECT id,device_id,hostname,os_name,app_version,last_ip,connection_status,last_heartbeat_at,wifi_ssid,wifi_bssid,wifi_signal,wifi_radio,wifi_channel,last_scan_at FROM devices ORDER BY updated_at DESC")->fetchAll();
+    $rows=db()->query("SELECT id,device_id,hostname,os_name,app_version,last_ip,CASE WHEN last_heartbeat_at IS NOT NULL AND last_heartbeat_at >= DATE_SUB(NOW(),INTERVAL 2 MINUTE) THEN 'online' ELSE 'offline' END AS connection_status,last_heartbeat_at,wifi_ssid,wifi_bssid,wifi_signal,wifi_radio,wifi_channel,last_scan_at FROM devices ORDER BY updated_at DESC")->fetchAll();
     json_response(['success'=>true,'devices'=>$rows]);
 }
 
