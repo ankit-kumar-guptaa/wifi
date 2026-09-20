@@ -1,36 +1,14 @@
-const {app,BrowserWindow,Tray,Menu,nativeImage}=require('electron');
-const os=require('os');
-const axios=require('axios');
-const path=require('path');
-
-const API_BASE_URL=process.env.API_BASE_URL||'http://localhost:8000/api';
-const HEARTBEAT_INTERVAL_MS=Number(process.env.HEARTBEAT_INTERVAL_MS||60000);
-let mainWindow,tray,timer;
-
-function createWindow(){
- mainWindow=new BrowserWindow({
-  width:460,height:360,show:true,
-  webPreferences:{contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'preload.js')}
- });
- mainWindow.loadFile(path.join(__dirname,'renderer','index.html'));
- mainWindow.on('close',e=>{if(!app.isQuitting){e.preventDefault();mainWindow.hide();}});
-}
-
-async function heartbeat(){
- const payload={device_id:os.hostname(),hostname:os.hostname(),os_name:process.platform+'-'+os.release(),app_version:app.getVersion()};
- try{await axios.post(API_BASE_URL+'/devices/heartbeat',payload,{timeout:10000});}catch{}
-}
-
-app.whenReady().then(async()=>{
- createWindow();
- tray=new Tray(nativeImage.createEmpty());
- tray.setToolTip('WiFi Device Manager');
- tray.setContextMenu(Menu.buildFromTemplate([
-  {label:'Open',click:()=>mainWindow.show()},
-  {label:'Quit',click:()=>{app.isQuitting=true;app.quit();}}
- ]));
- await heartbeat();
- timer=setInterval(heartbeat,HEARTBEAT_INTERVAL_MS);
-});
-app.on('window-all-closed',e=>e.preventDefault());
-app.on('before-quit',()=>clearInterval(timer));
+const {app,BrowserWindow,Tray,Menu,nativeImage,ipcMain}=require('electron');
+const os=require('os'),path=require('path'),axios=require('axios'),{execFile}=require('child_process'),fs=require('fs');
+const API=process.env.API_BASE_URL||'http://localhost:8000/api'; const INTERVAL=Number(process.env.HEARTBEAT_INTERVAL_MS||60000);
+const tokenFile=path.join(app.getPath('userData'),'device-token.json'); let win,tray,timer,deviceToken=null;
+function loadToken(){try{deviceToken=JSON.parse(fs.readFileSync(tokenFile,'utf8')).token||null}catch{}}
+function saveToken(token){fs.mkdirSync(path.dirname(tokenFile),{recursive:true});fs.writeFileSync(tokenFile,JSON.stringify({token},null,2));deviceToken=token}
+function localIp(){for(const list of Object.values(os.networkInterfaces()))for(const n of list||[])if(n.family==='IPv4'&&!n.internal)return n.address;return ''}
+function createWindow(){win=new BrowserWindow({width:560,height:500,show:true,webPreferences:{contextIsolation:true,nodeIntegration:false,preload:path.join(__dirname,'preload.js')}});win.loadFile(path.join(__dirname,'renderer','index.html'));win.on('close',e=>{if(!app.isQuitting){e.preventDefault();win.hide()}})}
+function netsh(){return new Promise(resolve=>execFile('netsh',['wlan','show','interfaces'],{windowsHide:true},(err,stdout)=>{if(err)return resolve({});const out=String(stdout);const get=k=>{const m=out.match(new RegExp('^\\s*'+k+'\\s*:\\s*(.+)$','mi'));return m?m[1].trim():''};resolve({ssid:get('SSID'),bssid:get('BSSID'),signal:get('Signal'),radio:get('Radio type'),channel:get('Channel')})}))}
+async function register(code){const p={enrollment_code:code,device_id:os.hostname(),hostname:os.hostname(),os_name:process.platform+'-'+os.release(),app_version:app.getVersion()};const r=await axios.post(API+'/devices/register',p,{timeout:10000});if(!r.data.success)throw new Error(r.data.message||'Registration failed');saveToken(r.data.device_token);return r.data}
+async function scanAndSend(id){const wifi=await netsh();await axios.post(API+'/devices/scan-result',{scan_id:id,...wifi},{headers:{Authorization:'Bearer '+deviceToken},timeout:10000})}
+async function heartbeat(){if(!deviceToken)return;try{const r=await axios.post(API+'/devices/heartbeat',{hostname:os.hostname(),os_name:process.platform+'-'+os.release(),app_version:app.getVersion(),last_ip:localIp()},{headers:{Authorization:'Bearer '+deviceToken},timeout:10000});if(r.data.scan_request)await scanAndSend(r.data.scan_request.id)}catch{}}
+ipcMain.handle('register-device',(_,code)=>register(String(code||'').trim().toUpperCase())); ipcMain.handle('agent-status',()=>({registered:!!deviceToken,deviceId:os.hostname(),api:API}));
+app.whenReady().then(async()=>{loadToken();createWindow();tray=new Tray(nativeImage.createEmpty());tray.setToolTip('WiFi Device Manager');tray.setContextMenu(Menu.buildFromTemplate([{label:'Open',click:()=>win.show()},{type:'separator'},{label:'Quit',click:()=>{app.isQuitting=true;app.quit()}}]));await heartbeat();timer=setInterval(heartbeat,INTERVAL)}); app.on('before-quit',()=>clearInterval(timer)); app.on('window-all-closed',()=>{});
